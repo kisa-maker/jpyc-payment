@@ -2,105 +2,138 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>JPYC 支払いページ</title>
-  <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
+  <title>JPYC支払いページ</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
   <style>
     body {
-      font-family: "Segoe UI", sans-serif;
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #f8fafc;
+      color: #1e293b;
       text-align: center;
-      background: #f8fafc;
-      color: #2c3e50;
       padding: 40px;
     }
     h1 {
-      font-size: 28px;
-      margin-bottom: 8px;
+      color: #2563eb;
     }
-    p { color: #555; }
     input {
-      padding: 12px;
-      font-size: 18px;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
       width: 200px;
-      border: 1px solid #ccc;
-      border-radius: 10px;
-      margin-top: 12px;
+      text-align: center;
+      font-size: 16px;
     }
     button {
-      margin-top: 24px;
-      padding: 14px 28px;
-      font-size: 16px;
-      background: #e84142;
+      background-color: #2563eb;
       color: white;
       border: none;
-      border-radius: 12px;
+      padding: 12px 24px;
+      border-radius: 10px;
       cursor: pointer;
-      transition: background 0.2s ease;
+      font-size: 16px;
+      margin-top: 10px;
     }
     button:hover {
-      background: #c23639;
+      background-color: #1d4ed8;
+    }
+    #walletAddress {
+      margin: 10px;
+      font-size: 14px;
+      color: #475569;
     }
   </style>
 </head>
 <body>
   <h1>JPYC 支払いページ</h1>
-  <p>受取アドレス：</p>
-  <code id="recipient">0xead0e649faa6017adcfed52ef4eb39a1a12e4b5b</code>
+  <p>このページでは Avalanche 上で JPYC を送金できます。</p>
 
-  <div style="margin-top:20px;">
-    <label for="amount">支払う金額（JPYC）</label><br />
-    <input id="amount" type="number" min="0.1" step="0.1" placeholder="例：100" />
-  </div>
+  <button id="connectButton">Metamaskを接続</button>
+  <button id="addTokenButton">JPYCをMetamaskに追加</button>
+  <p id="walletAddress"></p>
 
-  <button onclick="sendJPYC()">Metamaskで支払う</button>
+  <p>送金金額（JPYC）</p>
+  <input type="number" id="amount" placeholder="例: 100" />
+  <br /><br />
+  <button id="payButton">Metamaskで支払う</button>
 
   <script>
-    // === Avalanche上のJPYC設定 ===
     const tokenAddress = "0x431D5dfF03120AFA4bDf332c61A6e1766eF37BDB"; // JPYC (Avalanche)
-    const recipient = "0xead0e649faa6017adcfed52ef4eb39a1a12e4b5b";
-    // =============================
+    const receiver = "0xead0e649faa6017adcfed52ef4eb39a1a12e4b5b";
 
-    async function sendJPYC() {
-      const amountInput = document.getElementById("amount").value;
-      if (!amountInput || amountInput <= 0) {
-        alert("金額を入力してください。");
+    let provider, signer;
+
+    // ✅ Metamask接続
+    document.getElementById("connectButton").onclick = async () => {
+      if (!window.ethereum) {
+        alert("Metamaskが見つかりません。アプリ内ブラウザで開いてください。");
         return;
       }
+      provider = new ethers.providers.Web3Provider(window.ethereum);
+      await provider.send("eth_requestAccounts", []);
+      signer = provider.getSigner();
+      const address = await signer.getAddress();
+      document.getElementById("walletAddress").innerText = `接続中: ${address}`;
+    };
 
-      if (typeof window.ethereum === "undefined") {
+    // ✅ JPYCトークン追加ボタン
+    document.getElementById("addTokenButton").onclick = async () => {
+      if (!window.ethereum) {
         alert("Metamaskが見つかりません。");
         return;
       }
-
-      const web3 = new Web3(window.ethereum);
-      await ethereum.request({ method: "eth_requestAccounts" });
-
-      const tokenAbi = [
-        {
-          "constant": false,
-          "inputs": [
-            { "name": "_to", "type": "address" },
-            { "name": "_value", "type": "uint256" }
-          ],
-          "name": "transfer",
-          "outputs": [{ "name": "", "type": "bool" }],
-          "type": "function"
-        }
-      ];
-
-      const contract = new web3.eth.Contract(tokenAbi, tokenAddress);
-      const accounts = await web3.eth.getAccounts();
-
-      // JPYCは18桁（Wei換算）
-      const amount = Web3.utils.toWei(amountInput.toString(), "ether");
-
       try {
-        await contract.methods.transfer(recipient, amount).send({ from: accounts[0] });
-        alert("支払いが完了しました！ありがとうございました。");
+        const wasAdded = await window.ethereum.request({
+          method: "wallet_watchAsset",
+          params: {
+            type: "ERC20",
+            options: {
+              address: tokenAddress,
+              symbol: "JPYC",
+              decimals: 18,
+              image: "https://jpyc.jp/favicon.ico",
+            },
+          },
+        });
+        if (wasAdded) {
+          alert("JPYCがMetamaskに追加されました！");
+        } else {
+          alert("JPYCの追加がキャンセルされました。");
+        }
       } catch (err) {
         console.error(err);
-        alert("支払いがキャンセルされました。");
+        alert("トークン追加中にエラーが発生しました。");
       }
-    }
+    };
+
+    // ✅ 支払い処理
+    document.getElementById("payButton").onclick = async () => {
+      if (!signer) {
+        alert("まずMetamaskを接続してください。");
+        return;
+      }
+
+      const amount = document.getElementById("amount").value;
+      if (!amount || amount <= 0) {
+        alert("正しい金額を入力してください。");
+        return;
+      }
+
+      const decimals = 18;
+      const amountWei = ethers.utils.parseUnits(amount, decimals);
+      const abi = ["function transfer(address to, uint256 amount) public returns (bool)"];
+      const tokenContract = new ethers.Contract(tokenAddress, abi, signer);
+
+      try {
+        const tx = await tokenContract.transfer(receiver, amountWei);
+        alert("送金中... トランザクションが完了するまでお待ちください。");
+        await tx.wait();
+        alert("送金完了！");
+      } catch (err) {
+        console.error(err);
+        alert("送金に失敗しました。");
+      }
+    };
   </script>
 </body>
 </html>
