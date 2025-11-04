@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>JPYC 支払いページ</title>
+  <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      text-align: center;
+      background: #f8fafc;
+      color: #2c3e50;
+      padding: 40px;
+    }
+    h1 {
+      font-size: 28px;
+      margin-bottom: 8px;
+    }
+    p { color: #555; }
+    input {
+      padding: 12px;
+      font-size: 18px;
+      width: 200px;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      margin-top: 12px;
+    }
+    button {
+      margin-top: 24px;
+      padding: 14px 28px;
+      font-size: 16px;
+      background: #e84142;
+      color: white;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+    button:hover {
+      background: #c23639;
+    }
+  </style>
+</head>
+<body>
+  <h1>JPYC 支払いページ</h1>
+  <p>受取アドレス：</p>
+  <code id="recipient">0xead0e649faa6017adcfed52ef4eb39a1a12e4b5b</code>
+
+  <div style="margin-top:20px;">
+    <label for="amount">支払う金額（JPYC）</label><br />
+    <input id="amount" type="number" min="0.1" step="0.1" placeholder="例：100" />
+  </div>
+
+  <button onclick="sendJPYC()">Metamaskで支払う</button>
+
+  <script>
+    // === Avalanche上のJPYC設定 ===
+    const tokenAddress = "0x431D5dfF03120AFA4bDf332c61A6e1766eF37BDB"; // JPYC (Avalanche)
+    const recipient = "0xead0e649faa6017adcfed52ef4eb39a1a12e4b5b";
+    // =============================
+
+    async function sendJPYC() {
+      const amountInput = document.getElementById("amount").value;
+      if (!amountInput || amountInput <= 0) {
+        alert("金額を入力してください。");
+        return;
+      }
+
+      if (typeof window.ethereum === "undefined") {
+        alert("Metamaskが見つかりません。");
+        return;
+      }
+
+      const web3 = new Web3(window.ethereum);
+      await ethereum.request({ method: "eth_requestAccounts" });
+
+      const tokenAbi = [
+        {
+          "constant": false,
+          "inputs": [
+            { "name": "_to", "type": "address" },
+            { "name": "_value", "type": "uint256" }
+          ],
+          "name": "transfer",
+          "outputs": [{ "name": "", "type": "bool" }],
+          "type": "function"
+        }
+      ];
+
+      const contract = new web3.eth.Contract(tokenAbi, tokenAddress);
+      const accounts = await web3.eth.getAccounts();
+
+      // JPYCは18桁（Wei換算）
+      const amount = Web3.utils.toWei(amountInput.toString(), "ether");
+
+      try {
+        await contract.methods.transfer(recipient, amount).send({ from: accounts[0] });
+        alert("支払いが完了しました！ありがとうございました。");
+      } catch (err) {
+        console.error(err);
+        alert("支払いがキャンセルされました。");
+      }
+    }
+  </script>
+</body>
+</html>
